@@ -6,15 +6,15 @@ population dynamics on a CANN torus, encodes initial position from
 the maze trajectory, decodes estimated position from population activity.
 """
 import numpy as np
-import h5py, argparse, os
+import h5py, argparse
 import matplotlib
 matplotlib.use('Agg')
-import matplotlib.pyplot as plt
+
 
 
 from connectivity import compute_weight_matrix, assign_coordinates_and_directions, compute_feedforward_input
 
-def update_network(s, W, B, tau=10, dt=0.5):
+def update_network(s, W, B, tau=10.0, dt=0.5):
     """
     Один шаг динамики сети по уравнению (1).
 
@@ -161,6 +161,7 @@ def main():
 
     dt = 0.05
     tau_m = 10.0
+    alpha = 0.10315
 
     # ===== load trajectory =====
     with h5py.File(args.maze, 'r') as f:
@@ -188,7 +189,7 @@ def main():
         else:
             rates0 = rates[step - 1]
 
-        B = compute_feedforward_input(neuron_positions, neuron_directions, velocity[step, :], periodic=True)
+        B = compute_feedforward_input(neuron_positions, neuron_directions, velocity[step, :], alpha=alpha, periodic=True)
         rates[step] = update_network(rates0, W, B, tau=tau_m, dt=dt)
 
         if step % 5000 == 0:
