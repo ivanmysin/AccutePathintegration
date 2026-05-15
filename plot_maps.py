@@ -21,7 +21,29 @@ def load_data(path):
         trajectory = f['pos'][:]
     return activity, trajectory
 
+def gaussian_kernel_2d(size, sigma):
+    """Создает нормированное 2D гауссово ядро размера size x size."""
+    kernel = np.zeros((size, size))
+    center = size // 2
+    total = 0.0
+    for i in range(size):
+        for j in range(size):
+            x, y = i - center, j - center
+            value = np.exp(-(x**2 + y**2) / (2 * sigma**2))
+            kernel[i, j] = value
+            total += value
+    return kernel / total  # Нормировка: сумма = 1
 
+def convolve_2d(image, kernel):
+    """Простая 2D свёртка с нулевым дополнением (zero padding)."""
+    kh, kw = kernel.shape
+    pad_h, pad_w = kh // 2, kw // 2
+    padded = np.pad(image, ((pad_h, pad_h), (pad_w, pad_w)), mode='constant')
+    result = np.zeros_like(image)
+    for i in range(image.shape[0]):
+        for j in range(image.shape[1]):
+            result[i, j] = np.sum(padded[i:i+kh, j:j+kw] * kernel)
+    return result
 
 def build_spatial_maps(
         activity: np.ndarray,
@@ -87,6 +109,16 @@ def build_spatial_maps(
         range=range_xy,
         weights=activity
     )
+
+    # Параметры фильтра
+    kernel_size = 15
+    sigma = 1.0
+
+    # Создание нормированного гауссового ядра
+    kernel = gaussian_kernel_2d(kernel_size, sigma)
+
+    activity_map = convolve_2d(activity_map, kernel)
+    occupancy_map = convolve_2d(occupancy_map, kernel)
 
     # Нормировка: делим активность на посещения, избегая деления на 0
     with np.errstate(divide='ignore', invalid='ignore'):
