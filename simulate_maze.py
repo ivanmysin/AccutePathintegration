@@ -17,7 +17,7 @@ import os
 def build_maze(scale=1.0):
     env = ratinabox.Environment(params={
         'scale': scale,
-        'aspect': 1.0,
+        'aspect': 1,
         'dimensionality': '2D',
         'boundary_conditions': 'solid'
     })
@@ -25,19 +25,20 @@ def build_maze(scale=1.0):
     return env
 
 
-def simulate_maze(scale=1.0, duration=300.0, dt=0.05, seed=42, output='maze.hdf5'):
+def simulate_maze(scale=1.0, duration=300.0, dt=0.0005, seed=42, output='maze.hdf5'):
     np.random.seed(seed)
     print(f'[MAZE] {duration:.1f}s in {scale}m maze, dt={dt}')
 
     env = build_maze(scale)
-    agent = ratinabox.Agent(env)
-    agent.params['speed_mean'] = 0.08
-    agent.params['speed_std'] = 0.04
-    agent.params['dt'] = dt
+    agent = ratinabox.Agent(env, {
+        'speed_mean' : 0.15,
+        'speed_std' : 0.08,
+    })
+
 
     n_steps = int(duration / dt)
     for i in range(n_steps):
-        agent.update()
+        agent.update(dt=dt)
         if i % 5000 == 0:
             print(f'  step {i}/{n_steps}  pos=({agent.pos[0]:.2f},{agent.pos[1]:.2f})')
 
@@ -59,7 +60,7 @@ def simulate_maze(scale=1.0, duration=300.0, dt=0.05, seed=42, output='maze.hdf5
 
 
     print(f'[MAZE] saved {output} ({os.path.getsize(output)/1e3:.0f} KB)')
-    print(f'[MAZE] pos=({pos[-1,0]:.2f},{pos[-1,1]:.2f})  max_speed={speed.max():.3f}')
+    print(f'[MAZE] max_speed={speed.max():.3f} m/s; mean_speed={speed.mean():.3f} m/s; min_speed={speed.min():.3f} m/s')
 
     # Plot arena + trajectory
     fig, ax = plt.subplots(1, 1, figsize=(8, 8))
@@ -85,8 +86,8 @@ def simulate_maze(scale=1.0, duration=300.0, dt=0.05, seed=42, output='maze.hdf5
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('--scale', type=float, default=1.0)
-    p.add_argument('--duration', type=float, default=5000.0)
-    p.add_argument('--dt', type=float, default=0.05)
+    p.add_argument('--duration', type=float, default=600.0)
+    p.add_argument('--dt', type=float, default=0.0005)
     p.add_argument('--seed', type=int, default=42)
     p.add_argument('--output', type=str, default='simulated_pos.hdf5')
     args = p.parse_args()

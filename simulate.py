@@ -87,6 +87,68 @@ def create_periodic_pattern(n, lambda_net=13.0, amplitude=1.0):
 
     return pattern
 
+
+def initial_state_from_position(n, x0, y0, lambda_space=0.48, lambda_net=13.0, amplitude=1.0):
+    """
+    Генерирует начальную активность сети, соответствующую реальной позиции (x0, y0).
+
+    Параметры:
+    ----------
+    n : int
+        Размер квадратной сетки нейронов (n x n).
+    x0, y0 : float
+        Координаты старта в метрах.
+    lambda_space : float
+        Пространственный период решётки grid-клеток в метрах (например, 0.48).
+    lambda_net : float
+        Период решётки в нейронах (например, 13).
+    amplitude : float
+        Желаемая максимальная активность (пик решётки).
+
+    Возвращает:
+    ----------
+    s0 : np.ndarray, shape (n*n,)
+        Начальная активность нейронов (неотрицательная).
+    """
+    # 1. Координаты нейронов в нейронном пространстве (с центром в 0)
+    x_neurons = np.arange(n) - (n - 1) / 2.0
+    y_neurons = np.arange(n) - (n - 1) / 2.0
+    xx, yy = np.meshgrid(x_neurons, y_neurons)
+    r = np.stack([xx.ravel(), yy.ravel()], axis=1)   # (N, 2)
+
+    # 2. Волновые векторы для треугольной решётки
+    k = 2.0 * np.pi / lambda_net
+    k1 = np.array([k, 0.0])
+    k2 = np.array([-k/2.0, k * np.sqrt(3)/2.0])
+    k3 = np.array([-k/2.0, -k * np.sqrt(3)/2.0])
+
+    # 3. Базовый паттерн (без сдвига)
+    cos1 = np.cos(np.dot(r, k1))
+    cos2 = np.cos(np.dot(r, k2))
+    cos3 = np.cos(np.dot(r, k3))
+    pattern = (cos1 + cos2 + cos3) / 3.0
+    pattern = pattern - pattern.min()                 # сделать неотрицательным
+    if pattern.max() > 0:
+        pattern = amplitude * pattern / pattern.max()
+    else:
+        pattern = np.zeros_like(pattern)
+
+    # 4. Преобразование реальных координат в сдвиг в нейронах
+    scale = lambda_net / lambda_space
+    shift_x = x0 * scale
+    shift_y = y0 * scale
+
+    # 5. Циклический сдвиг (с учётом периодических границ)
+    pattern_2d = pattern.reshape(n, n)
+    # Округляем до ближайшего целого (допустимо для дискретной сетки)
+    dx = int(round(shift_x))
+    dy = int(round(shift_y))
+    shifted = np.roll(pattern_2d, shift=dx, axis=1)   # сдвиг по x
+    shifted = np.roll(shifted, shift=dy, axis=0)      # сдвиг по y
+
+    return shifted.ravel()
+
+
 def main():
     # ===== parse =====
     p = argparse.ArgumentParser()
@@ -103,9 +165,9 @@ def main():
     # ===== load trajectory =====
     with h5py.File(args.maze, 'r') as f:
         true_pos = np.array(f['position'])       # (T, 2)
-        velocity = np.array(f['speed'])   * 0.01    # (T, 2)
+        velocity = np.array(f['speed'])          # (T, 2)
 
-    n_steps = len(true_pos)
+    n_steps = true_pos.shape[0]
 
     # ===== precompute kernel =====
 
@@ -114,18 +176,23 @@ def main():
 
     rates = np.zeros((n_steps, N**2), dtype=float)
     # ===== simulate =====
+    print('Simulating...')
     for step in range(n_steps):
         if step == 0:
-            rates0 = create_periodic_pattern(N)
-            for i in range(10):
-                B =  compute_feedforward_input(neuron_positions, neuron_directions, np.asarray([0, 0]), periodic=True)
-                rates0 = update_network(rates0, W, B, tau=tau_m, dt=dt)
+            # rates0 = create_periodic_pattern(N)
+            # for i in range(10):
+            #     B =  compute_feedforward_input(neuron_positions, neuron_directions, np.asarray([0, 0]), periodic=True)
+            #     rates0 = update_network(rates0, W, B, tau=tau_m, dt=dt)
+            rates0 = initial_state_from_position(N, true_pos[0, 0], true_pos[0, 1])
 
         else:
             rates0 = rates[step - 1]
 
-        B =  compute_feedforward_input(neuron_positions, neuron_directions, velocity[step, :], periodic=True)
+        B = compute_feedforward_input(neuron_positions, neuron_directions, velocity[step, :], periodic=True)
         rates[step] = update_network(rates0, W, B, tau=tau_m, dt=dt)
+
+        if step % 5000 == 0:
+            print(f' step {step}/{n_steps}')
 
 
     # ===== save =====
