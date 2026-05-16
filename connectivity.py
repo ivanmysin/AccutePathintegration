@@ -98,9 +98,10 @@ def compute_weight_matrix(positions, directions, a=1.0, beta=None, gamma=None, l
     # Заполнение матрицы
     for i in range(N):
         xi, yi = positions[i]
-        sx, sy = shift_vectors[i]
         for j in range(N):
+            sx, sy = shift_vectors[j]
             xj, yj = positions[j]
+
             dx = xi - xj - sx
             dy = yi - yj - sy
 

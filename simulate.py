@@ -8,8 +8,8 @@ the maze trajectory, decodes estimated position from population activity.
 import numpy as np
 import h5py, argparse
 import matplotlib
-matplotlib.use('Agg')
-
+matplotlib.use('qt5Agg')
+import matplotlib.pyplot as plt
 
 
 from connectivity import compute_weight_matrix, assign_coordinates_and_directions, compute_feedforward_input
@@ -155,17 +155,19 @@ def initial_state_from_position(n, x0, y0, lambda_space=0.48, lambda_net=13.0, a
 def main():
     # ===== parse =====
     p = argparse.ArgumentParser()
-    p.add_argument('--maze', type=str, default='simulated_pos.hdf5', help='Trajectory file')
-    p.add_argument('--N', type=int, default=64, help='Torus lattice size')
+    p.add_argument('--maze', type=str, default='true_simulated_pos.hdf5', help='Trajectory file')
+    p.add_argument('--N', type=int, default=32, help='Torus lattice size')
     p.add_argument('--torus_scale', type=float, default=1.0, help='Torus physical scale (m)')
     p.add_argument('--output', type=str, default='activity.hdf5')
     args = p.parse_args()
     N = int(args.N)
 
-    dt = 0.05
+    dt = 0.5
     tau_m = 10.0
-    alpha = 0.10315
+    alpha = 0.1 * 0.10315
     a = 1.0
+
+    Trelax = 200
 
     # ===== load trajectory =====
     with h5py.File(args.maze, 'r') as f:
@@ -177,11 +179,17 @@ def main():
     # ===== precompute kernel =====
 
     neuron_positions, neuron_directions = assign_coordinates_and_directions(N)
-    W = compute_weight_matrix(neuron_positions, neuron_directions, a=a, periodic=True)
+    W = 2.0 * compute_weight_matrix(neuron_positions, neuron_directions, a=a, periodic=True)
+
+    # with h5py.File('W.h5', 'w') as f:
+    #     f.create_dataset('W', data=W)
 
 
     # ===== simulate =====
     chunk_size = 5000
+    if n_steps < chunk_size:
+        chunk_size = n_steps
+
     saving_file = h5py.File(args.output, 'w')
     saving_file.create_dataset('activity', (n_steps, N**2), dtype='float32', chunks=(chunk_size, N**2))
     saving_file.create_dataset('pos', data=true_pos)
@@ -189,30 +197,49 @@ def main():
     rates_chunk = np.zeros((chunk_size, N**2), dtype=np.float32)
     idx = 0
 
-    print('Simulating...')
-    for step in range(n_steps):
-        if step == 0:
-            rates0 = initial_state_from_position(N, true_pos[0, 0], true_pos[0, 1])
-        else:
-            rates0 = rates_prev
+    rates0 = initial_state_from_position(N, true_pos[0, 0], true_pos[0, 1])
+    nsteps_pred = int(Trelax/dt)
 
-        B = compute_feedforward_input(neuron_positions, neuron_directions, velocity[step, :], alpha=alpha, periodic=True)
+    print('Simulating...')
+    for step in range(n_steps + nsteps_pred):
+        step_real = step - nsteps_pred
+        if step < nsteps_pred:
+            vel = np.asarray([0.0, 0.0])
+        else:
+            vel = velocity[step_real, :]
+
+        B = compute_feedforward_input(neuron_positions, neuron_directions, vel, alpha=alpha, periodic=True)
         rates = update_network(rates0, W, B, tau=tau_m, dt=dt)
-        rates_prev = rates
+        rates0 = rates
+
+        if step_real < 0:
+            continue
+
+
+
         rates_chunk[idx] = rates
         idx += 1
 
-        if idx == chunk_size or step == n_steps - 1:
-            start = step - idx + 1
-            end = step + 1
+        if idx == chunk_size or step_real == n_steps - 1:
+            start = step_real - idx + 1
+            end = step_real + 1
             saving_file['activity'][start:end] = rates_chunk[:idx]
             idx = 0
 
         if step % 5000 == 0:
-            print(f' step {step}/{n_steps}')
+            print(f' step {step_real}/{n_steps}')
 
     # ===== save =====
+
+
+    # fig, axes = plt.subplots()
+    #
+    # axes.imshow( saving_file['activity'][:].T, aspect='auto', cmap='viridis')
+    #
+    # plt.show()
+
     saving_file.close()
+
 
 if __name__ == '__main__':
     main()
