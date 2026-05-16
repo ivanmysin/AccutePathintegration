@@ -45,7 +45,7 @@ def assign_coordinates_and_directions(n):
 
     return positions, directions
 
-def compute_weight_matrix(positions, directions, a=1.0, beta=None, gamma=None, l=2.0, periodic=True):
+def compute_weight_matrix(positions, directions, a=1.0, beta=None, gamma=None, l=2.0, periodic=True, normalize=False):
     """
     Вычисляет матрицу рекуррентных весов W на основе заданных координат и направлений нейронов.
 
@@ -111,6 +111,9 @@ def compute_weight_matrix(positions, directions, a=1.0, beta=None, gamma=None, l
 
             r2 = dx*dx + dy*dy
             W[i, j] = w0(r2)
+
+    if normalize:
+        W = W / N
 
     return W
 

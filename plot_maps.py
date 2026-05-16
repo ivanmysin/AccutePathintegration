@@ -15,11 +15,10 @@ import matplotlib.pyplot as plt
 from typing import Tuple, Optional
 
 
-def load_data(path):
+def load_neurons_and_traj(path, n_neurons):
     with h5py.File(path, 'r') as f:
-        activity  = f['activity'][:]
-        trajectory = f['pos'][:]
-    return activity, trajectory
+        traj = f['pos'][:]
+    return traj, n_neurons
 
 def gaussian_kernel_2d(size, sigma):
     """Создает нормированное 2D гауссово ядро размера size x size."""
@@ -130,32 +129,28 @@ def build_spatial_maps(
 
 
 def main(inpath, prefix):
-    activity, pos = load_data(inpath)
+    print('Getting trajectory and neuron count ...')
 
-    print(activity.shape)
+    f =  h5py.File(inpath, 'r')
+    traj = f['pos'][:]
+    n_neurons = f['activity'].shape[1]
+    act_ds = f['activity']
 
     range_xy = [[0, 1], [0, 1]]
 
-    for i in range(activity.shape[1]):
-        print('Plotting map %d/%d ...' % (i+1, activity.shape[1]))
+    for i in range(n_neurons):
+        print('Plotting map %d/%d ...' % (i+1, n_neurons))
+        activity_i = act_ds[:, i]
 
-        rate_map, occupancy_map, activity_map, info = build_spatial_maps(activity[:, i], pos, bins = 50, range_xy=range_xy)
+        rate_map, occupancy_map, activity_map, info = build_spatial_maps(activity_i, traj, bins=50, range_xy=range_xy)
 
         fig, axes = plt.subplots(figsize=(5, 5))
-
+        os.makedirs('results', exist_ok=True)
         axes.imshow(rate_map, cmap='rainbow', origin='lower')
-
-        fig.savefig( 'results/' + prefix + '_' + str(i) + '.png')
-
+        fig.savefig('results/' + prefix + '_' + str(i) + '.png')
         plt.close(fig)
 
-        # if i > 10:
-        #     break
-
-
-
-
-
+    f.close()
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()

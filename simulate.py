@@ -39,6 +39,9 @@ def update_network(s, W, B, tau=10.0, dt=0.5):
     total_input = np.dot(W, s) + B
     # Нелинейность f(x) = max(0, x)
     f_in = np.maximum(total_input, 0.0)
+
+    f_in = np.sqrt(f_in)
+
     s_new = s + (dt / tau) * (-s + f_in)
     return s_new
 
@@ -153,7 +156,7 @@ def main():
     # ===== parse =====
     p = argparse.ArgumentParser()
     p.add_argument('--maze', type=str, default='simulated_pos.hdf5', help='Trajectory file')
-    p.add_argument('--N', type=int, default=32, help='Torus lattice size')
+    p.add_argument('--N', type=int, default=64, help='Torus lattice size')
     p.add_argument('--torus_scale', type=float, default=1.0, help='Torus physical scale (m)')
     p.add_argument('--output', type=str, default='activity.hdf5')
     args = p.parse_args()
@@ -162,6 +165,7 @@ def main():
     dt = 0.05
     tau_m = 10.0
     alpha = 0.10315
+    a = 1.0
 
     # ===== load trajectory =====
     with h5py.File(args.maze, 'r') as f:
@@ -173,34 +177,42 @@ def main():
     # ===== precompute kernel =====
 
     neuron_positions, neuron_directions = assign_coordinates_and_directions(N)
-    W = compute_weight_matrix(neuron_positions, neuron_directions, periodic=True)
+    W = compute_weight_matrix(neuron_positions, neuron_directions, a=a, periodic=True)
 
-    rates = np.zeros((n_steps, N**2), dtype=float)
+
     # ===== simulate =====
+    chunk_size = 5000
+    saving_file = h5py.File(args.output, 'w')
+    saving_file.create_dataset('activity', (n_steps, N**2), dtype='float32', chunks=(chunk_size, N**2))
+    saving_file.create_dataset('pos', data=true_pos)
+
+    rates_chunk = np.zeros((chunk_size, N**2), dtype=np.float32)
+    idx = 0
+
     print('Simulating...')
     for step in range(n_steps):
         if step == 0:
-            # rates0 = create_periodic_pattern(N)
-            # for i in range(10):
-            #     B =  compute_feedforward_input(neuron_positions, neuron_directions, np.asarray([0, 0]), periodic=True)
-            #     rates0 = update_network(rates0, W, B, tau=tau_m, dt=dt)
             rates0 = initial_state_from_position(N, true_pos[0, 0], true_pos[0, 1])
-
         else:
-            rates0 = rates[step - 1]
+            rates0 = rates_prev
 
         B = compute_feedforward_input(neuron_positions, neuron_directions, velocity[step, :], alpha=alpha, periodic=True)
-        rates[step] = update_network(rates0, W, B, tau=tau_m, dt=dt)
+        rates = update_network(rates0, W, B, tau=tau_m, dt=dt)
+        rates_prev = rates
+        rates_chunk[idx] = rates
+        idx += 1
+
+        if idx == chunk_size or step == n_steps - 1:
+            start = step - idx + 1
+            end = step + 1
+            saving_file['activity'][start:end] = rates_chunk[:idx]
+            idx = 0
 
         if step % 5000 == 0:
             print(f' step {step}/{n_steps}')
 
-
     # ===== save =====
-    with h5py.File(args.output, 'w') as f:
-        f.create_dataset('activity', data=rates)
-        f.create_dataset('pos', data=true_pos)
-
+    saving_file.close()
 
 if __name__ == '__main__':
     main()
