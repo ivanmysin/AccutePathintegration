@@ -164,10 +164,10 @@ def main():
 
     dt = 0.5
     tau_m = 10.0
-    alpha = 0.1 * 0.10315
+    alpha = 0.02 * 0.10315
     a = 1.0
 
-    Trelax = 200
+    Trelax = 50
 
     # ===== load trajectory =====
     with h5py.File(args.maze, 'r') as f:
@@ -179,7 +179,7 @@ def main():
     # ===== precompute kernel =====
 
     neuron_positions, neuron_directions = assign_coordinates_and_directions(N)
-    W = 2.0 * compute_weight_matrix(neuron_positions, neuron_directions, a=a, periodic=True)
+    W = compute_weight_matrix(neuron_positions, neuron_directions, a=a, periodic=True)
 
     # with h5py.File('W.h5', 'w') as f:
     #     f.create_dataset('W', data=W)
