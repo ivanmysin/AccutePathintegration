@@ -6,7 +6,7 @@ if __name__ == '__main__':
     T = 5000
     dt = 0.5
 
-    Vconst = np.array([0.0, 15.0])
+    Vconst = np.array([0.15, 0.15])
 
     x0 = 0.5
     y0 = 0.5

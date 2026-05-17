@@ -164,7 +164,7 @@ def main():
 
     dt = 0.5
     tau_m = 10.0
-    alpha = 0.02 * 0.10315
+    alpha = 1.2 * 0.10315
     a = 1.0
 
     Trelax = 50
@@ -232,11 +232,11 @@ def main():
     # ===== save =====
 
 
-    # fig, axes = plt.subplots()
-    #
-    # axes.imshow( saving_file['activity'][:].T, aspect='auto', cmap='viridis')
-    #
-    # plt.show()
+    fig, axes = plt.subplots()
+
+    axes.imshow( saving_file['activity'][:].T, aspect='auto', cmap='viridis')
+
+    plt.show()
 
     saving_file.close()
 

@@ -17,31 +17,59 @@ def assign_coordinates_and_directions(n):
         Массив единичных векторов предпочтительных направлений.
         Возможные векторы: (0,1) - север, (1,0) - восток, (0,-1) - юг, (-1,0) - запад.
     """
-    N = n * n
-    positions = np.zeros((N, 2), dtype=int)
-    directions = np.zeros((N, 2), dtype=int)
+    # N = n * n
+    # positions = np.zeros((N, 2), dtype=int)
+    # directions = np.zeros((N, 2), dtype=int)
+    #
+    # # Словарь для отображения остатков координат (x%2, y%2) в направление
+    # # В каждом 2x2 блоке порядок (по строкам, столбцам):
+    # # (0,0): N (0,1)
+    # # (1,0): E (1,0)
+    # # (0,1): W (-1,0)
+    # # (1,1): S (0,-1)
+    # dir_map = {
+    #     (0, 0): (0, 1),   # N
+    #     (1, 0): (1, 0),   # E
+    #     (0, 1): (-1, 0),  # W
+    #     (1, 1): (0, -1)   # S
+    # }
+    #
+    # idx = 0
+    # for y in range(n):
+    #     for x in range(n):
+    #         positions[idx] = (x, y)
+    #         # Определяем остатки от деления на 2
+    #         dx, dy = dir_map[(x % 2, y % 2)]
+    #         directions[idx] = (dx, dy)
+    #         idx += 1
+    #
+    # positions = positions - n / 2
 
-    # Словарь для отображения остатков координат (x%2, y%2) в направление
-    # В каждом 2x2 блоке порядок (по строкам, столбцам):
-    # (0,0): N (0,1)
-    # (1,0): E (1,0)
-    # (0,1): W (-1,0)
-    # (1,1): S (0,-1)
-    dir_map = {
-        (0, 0): (0, 1),   # N
-        (1, 0): (1, 0),   # E
-        (0, 1): (-1, 0),  # W
-        (1, 1): (0, -1)   # S
-    }
 
-    idx = 0
-    for y in range(n):
-        for x in range(n):
-            positions[idx] = (x, y)
-            # Определяем остатки от деления на 2
-            dx, dy = dir_map[(x % 2, y % 2)]
-            directions[idx] = (dx, dy)
-            idx += 1
+    e = np.asarray( [ [0.0, 90.0],
+                      [180.0, 270.0], ] )
+
+    e = np.deg2rad(e)
+
+    direcs = np.tile(e, reps=[n//2, n//2])
+
+    direcs_x = np.cos(direcs)
+    direcs_y = np.sin(direcs)
+
+
+    g = np.arange(-n//2, n//2)
+    pos_x, pos_y = np.meshgrid(g, g)
+
+    # print(pos_x)
+    # print('=======' * 10)
+    # print(pos_y)
+
+
+    directions = np.stack([direcs_x.ravel(), direcs_y.ravel()], axis=1)
+
+
+    positions = np.stack([pos_x.ravel(), pos_y.ravel()], axis=1)
+
 
     return positions, directions
 
@@ -198,8 +226,9 @@ def compute_feedforward_input(positions, directions, velocity, alpha=0.10315, pe
 # Пример использования (для маленькой сети, чтобы не перегружать память)
 if __name__ == "__main__":
     n_small = 8   # 8x8 = 64 нейрона
-    W_periodic = compute_weight_matrix(n_small, periodic=True)
-    W_aperiodic = compute_weight_matrix(n_small, periodic=False)
-    print(f"Размер матрицы: {W_periodic.shape}")
-    print("Ненулевых элементов (период.):", np.count_nonzero(W_periodic))
-    print("Ненулевых элементов (апериод.):", np.count_nonzero(W_aperiodic))
+    positions, directions = assign_coordinates_and_directions(n_small)
+
+
+    print("Координаты и направления:")
+    print(positions)
+    print(directions)
