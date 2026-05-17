@@ -6,13 +6,65 @@ import numpy as np
 import h5py
 import argparse
 import os
-
-matplotlib = __import__('matplotlib')
-matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-
-
+from scipy.signal import correlate2d
 from typing import Tuple, Optional
+
+def autocorr_2d(signal, centered=True, normalize=False):
+    """
+    Вычисление двумерной автокорреляционной функции через БПФ.
+
+    Параметры
+    ----------
+    signal : np.ndarray
+        Двумерный массив (вещественный сигнал).
+    centered : bool, optional (default=True)
+        Если True, нулевая задержка помещается в центр выходного массива
+        (используется fftshift). Иначе нулевая задержка находится в индексе (0,0).
+    normalize : bool, optional (default=False)
+        Если True, из сигнала вычитается среднее, а результат делится на
+        значение автокорреляции в нулевой задержке.
+        Так получается автокорреляция, нормированная на 1 в нуле.
+
+    Возвращает
+    -------
+    corr : np.ndarray
+        Массив автокорреляции формы (2*H - 1, 2*W - 1), где H, W — размеры signal.
+    """
+    H, W = signal.shape
+
+    # При необходимости вычитаем среднее
+    work_signal = signal.astype(np.float64, copy=False)
+    if normalize:
+        work_signal = work_signal - np.mean(work_signal)
+
+    # Размер для линейной корреляции (без циклических наложений)
+    out_h, out_w = 2 * H - 1, 2 * W - 1
+
+    # Дополнение нулями
+    padded = np.zeros((out_h, out_w), dtype=work_signal.dtype)
+    padded[:H, :W] = work_signal
+
+    # Вычисляем БПФ
+    F = np.fft.fft2(padded)
+
+    # Автокорреляция: обратное БПФ от |F|^2
+    corr = np.fft.ifft2(F * np.conj(F)).real
+
+    # Центрируем (нулевая задержка в центр)
+    if centered:
+        corr = np.fft.fftshift(corr)
+
+    # Нормировка (после центрирования, чтобы правильно найти нулевую задержку)
+    if normalize:
+        # Позиция нулевой задержки: при centered – центр массива, иначе (0,0)
+        if centered:
+            zero_lag = (corr.shape[0] // 2, corr.shape[1] // 2)
+        else:
+            zero_lag = (0, 0)
+        corr = corr / corr[zero_lag]
+
+    return corr
 
 
 def load_neurons_and_traj(path, n_neurons):
@@ -136,7 +188,7 @@ def main(inpath, prefix):
     n_neurons = f['activity'].shape[1]
     act_ds = f['activity']
 
-    range_xy = [[0, 1], [0, 1]]
+    range_xy = ((0, 1), (0, 1))
 
     for i in range(n_neurons):
         print('Plotting map %d/%d ...' % (i+1, n_neurons))
@@ -144,9 +196,18 @@ def main(inpath, prefix):
 
         rate_map, occupancy_map, activity_map, info = build_spatial_maps(activity_i, traj, bins=50, range_xy=range_xy)
 
-        fig, axes = plt.subplots(figsize=(5, 5))
+        #autocorr = autocorr_2d(rate_map)
+        autocorr = correlate2d(rate_map, rate_map, mode='same')
+
+        fig, axes = plt.subplots(1, 2, figsize=(9, 4))
+
+        axes[0].imshow(rate_map, cmap='rainbow', origin='lower')
+        axes[0].set_title('Rate map')
+
+        axes[1].imshow(autocorr, cmap='rainbow', origin='lower')
+        axes[1].set_title('Autocorrelogram')
+
         os.makedirs('results', exist_ok=True)
-        axes.imshow(rate_map, cmap='rainbow', origin='lower')
         fig.savefig('results/' + prefix + '_' + str(i) + '.png')
         plt.close(fig)
 

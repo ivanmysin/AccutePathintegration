@@ -40,7 +40,7 @@ def update_network(s, W, B, tau=10.0, dt=0.5):
     # Нелинейность f(x) = max(0, x)
     f_in = np.maximum(total_input, 0.0)
 
-    f_in = np.sqrt(f_in)
+    # f_in = np.sqrt(f_in)
 
     s_new = s + (dt / tau) * (-s + f_in)
     return s_new
@@ -164,7 +164,7 @@ def main():
 
     dt = 0.5
     tau_m = 10.0
-    alpha = 1.2 * 0.10315
+    alpha = 1.0 * 0.10315
     a = 1.0
 
     Trelax = 50
@@ -179,7 +179,7 @@ def main():
     # ===== precompute kernel =====
 
     neuron_positions, neuron_directions = assign_coordinates_and_directions(N)
-    W = compute_weight_matrix(neuron_positions, neuron_directions, a=a, periodic=True)
+    W = 4.0 * compute_weight_matrix(neuron_positions, neuron_directions, a=a, periodic=True)
 
     # with h5py.File('W.h5', 'w') as f:
     #     f.create_dataset('W', data=W)
@@ -231,12 +231,12 @@ def main():
 
     # ===== save =====
 
+    if  len(saving_file['activity']) < 50000:
+        fig, axes = plt.subplots()
 
-    fig, axes = plt.subplots()
+        axes.imshow( saving_file['activity'][:].T, aspect='auto', cmap='viridis')
 
-    axes.imshow( saving_file['activity'][:].T, aspect='auto', cmap='viridis')
-
-    plt.show()
+        plt.show()
 
     saving_file.close()
 
